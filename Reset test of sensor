@@ -1,0 +1,57 @@
+/*
+nitialization Procedure—Reset And
+Presence Pulses
+All communication with the DS18B20 begins with an initialization
+sequence that consists of a reset pulse from the
+master followed by a presence pulse from the DS18B20.
+This is illustrated in Figure 15. When the DS18B20 sends
+the presence pulse in response to the reset, it is indicating
+to the master that it is on the bus and ready to operate.
+During the initialization sequence the bus master transmits
+(TX) the reset pulse by pulling the 1-Wire bus low
+for a minimum of 480µs. The bus master then releases
+the bus and goes into receive mode (RX). When the bus
+is released, the 5kΩ pullup resistor pulls the 1-Wire bus
+high. When the DS18B20 detects this rising edge, it waits
+15µs to 60µs and then transmits a presence pulse by pulling
+the 1-Wire bus low for 60µs to 240µs.
+*/
+//device: Atmega8a
+/*
+ * DS18B20_TEMP_SENSOR.c
+ *
+ * Created: 19/07/2018 11:37:11 p. m.
+ *  Author: D.
+ */ 
+#define F_CPU 1000000UL
+#include <avr/io.h>
+#include <util/delay.h>
+
+
+
+void reset_DS18B20();	
+int main(void)
+{
+	reset_DS18B20();
+	
+    while(1)
+    {
+       _delay_us(15);
+	   if (( PIND & 0b00000001)==0)
+	   {
+		   DDRD|=1<<PIND1;
+		   PORTD|=1<<PIND1;
+	   }
+	 
+    }
+}
+
+ void reset_DS18B20()
+{
+	DDRD|=1<<PIND0;
+	PORTD&=~(1<<PIND0);
+	_delay_us(500);
+	DDRD&=~(1<<PIND0);//pin again as input
+	PORTD|=1<<PIND0;//enable pull up
+	;
+}
