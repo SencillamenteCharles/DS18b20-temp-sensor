@@ -47,7 +47,7 @@ int main(void)
 		 int arr[9];
 		 receiveData_DS18B20(&arr,9);
 		 DDRB=255;
-		 PORTB=arr[1];
+		 PORTB=arr[1];                    // display on portb byte MSB of temperaute (arr[1]), or array[0] for LSB
 		 
 	   }
 	   _delay_ms(800);
