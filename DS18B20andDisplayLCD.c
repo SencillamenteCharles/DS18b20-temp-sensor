@@ -1,27 +1,35 @@
 /*
- * DS18B20_TEMP_SENSOR.c
+ * GccApplication1.c
  *
- * Created: 19/07/2018 11:37:11 p. m.
- *  Author: D.
+ * Created: 07/12/2018 01:25:15 p. m.
+ * Author : Charles
  */ 
+
 #define F_CPU 1000000UL
 #include <avr/io.h>
 #include <util/delay.h>
 #include <string.h>
 
+//**** thermometer commands ***
 #define skipRom 0xCC
 #define convertT 0x44
 #define readScratchPad 0xBE
+
 #define UP     1
 #define DOWN   0
 #define RX 2
+#define LCD_DBUS  PORTB
+
 typedef enum{FALSE,TRUE}bool;
 
+int data[9]={};
 struct{
     float temp_f;
 	int temp_i;
 	int temp;
 }temp;	
+
+//*** THERMOMETER FUNCTIONS ***
 void pinMode(uint8_t MODE);
 bool reset_DS18B20();
 void sendCommand_DS18B20(uint8_t command);	
@@ -30,47 +38,47 @@ float getTempDecs(uint8_t arr[]);
 int8_t getTempInts(uint8_t arr[]);
 float getTemp();
 
-
-
-#define LCD_DBUS  PORTB
-
+//*** 16x2 LCD FUNCTIONS ***
 void init_LCD();
 void carga_datos_LCD(uint8_t DATA);//commands or data 
 void print_char_LCD(char DATA);//only data
 void printString_LCD(char* s,uint8_t line, uint8_t cursor);//receives a string and its position on screen
 void setCursor_LCD(uint8_t line, uint8_t cursor);//called by printString_LCD
 uint8_t getDigits(unsigned int n,uint8_t (*arr)[],int arrLen);
-
 void printUint_LCD( unsigned int n);//needs cursor colocation
 void printFloat_LCD(float n,uint8_t decimals,uint8_t line,uint8_t cusor);
 
-int data[9]={};
+
 int main(void)
 {
 	 
-	init_LCD();	
-    while(1)
-    {
-		printFloat_LCD(getTemp(),4,1,0);
-		printString_LCD("temp each second",0,0);
+	init_LCD();
+	DDRD|=1<<PIND0;//enabling pind0 as an output
 		
+	 while(1)
+    {
+		printFloat_LCD(getTemp(),4,1,0);//(floating number, decimals,line,cursor)
+		printString_LCD("temp each second",0,0);	
     }
 }
+
+
+
 void pinMode(uint8_t MODE)
 {
-	if(MODE==UP)
+	if(MODE==UP)//for writing 1
 	{
 	DDRD|=1<<PIND0;
 	PORTD|=1<<PIND0;
 	}	
-	else if(MODE==DOWN)
+	else if(MODE==DOWN)//for writing zeros
 	{
 	DDRD|=1<<PIND0;
 	PORTD&=~(1<<PIND0);//pin 
 	}
 	else
 	{
-	DDRD&=~(1<<PIND0);//pin again as input
+	DDRD&=~(1<<PIND0);//pin again as input 
 	//PORTD|=1<<PIND0;//enable pull up
 	}
 	
@@ -83,11 +91,7 @@ void pinMode(uint8_t MODE)
 	pinMode(RX);//pin set as input with pull up enabled
 	_delay_us(60);
 	if ((PIND & 0b00000001)==DOWN)
-	{
-		
-		return TRUE;
-		
-	}		
+		return TRUE;		
 	else
 	    return FALSE;
 }
@@ -111,10 +115,10 @@ void sendCommand_DS18B20(uint8_t command)
 		writeSlot=(command>>i ) & 0b00000001;
 		if ( writeSlot==1)//write 1 slot?
 		{
-			PORTD&=~(1<<PIND0);
+			PORTD&=~(1<<PIND0);//set pin low
+			_delay_us(1);
+			PORTD|=1<<PIND0;//set pin high
 			_delay_us(15);
-			PORTD|=1<<PIND0;
-			_delay_us(45);
 		}
 		else
 		{
@@ -126,7 +130,7 @@ void sendCommand_DS18B20(uint8_t command)
 		_delay_us(1);//rest time
 		
 	}
-	//pinMode(RX);
+	
 	
 }
 bool receiveData_DS18B20(uint8_t(* arr)[],uint8_t arr_lenght)
@@ -136,23 +140,23 @@ bool receiveData_DS18B20(uint8_t(* arr)[],uint8_t arr_lenght)
 	
 	for (uint8_t i=0;i<arr_lenght;i++)
 	{
-		_delay_us(200);
+		//_delay_us(200);w
 		data[i]=0;
 		for (uint8_t b=0;b<8;b++)
 		{
 			pinMode(DOWN);
-			pinMode(UP);
-			//slave sends bit
-			pinMode(RX);
-			PORTD|=1<<PIND0;
 			_delay_us(2);
+			DDRD&=~(1<<PIND0);
+			_delay_us(10);//12 FOR TO 220
 			data[i]=data[i]>>1;
 			if ((PIND & 0b00000001)==0)//if after 15us the bus is high, we have a one
 				{	
 				}
-			else
-			    data[i]|=0b10000000;						
-			_delay_us(58);	
+			else{
+			    data[i]|=0b10000000;
+										
+				}
+			_delay_us(45);	
 		}
 		
 		
@@ -162,7 +166,7 @@ bool receiveData_DS18B20(uint8_t(* arr)[],uint8_t arr_lenght)
 float getTempDecs(uint8_t arr[])
 {
 	//arr[0] contains LSB part of temperature number
-	// and his lowet nibble the decimal parts
+	// and his lower nibble the decimal parts
 	uint8_t i;
   float dpwrs[4]={0.0625,.125,.25,.5};
   float acum=0;
@@ -176,24 +180,24 @@ float getTempDecs(uint8_t arr[])
 }
 int8_t getTempInts(uint8_t arr[])
 {
-  
-    int8_t aux=0;
-     aux|=(arr[0]>>4 | arr[1]<<4);
-    return aux;
-   
+	return arr[0]>>4 | arr[1]<<4; 
 }
 float getTemp()
 {
 	  if(reset_DS18B20())
-	   {_delay_us(200);
-	   sendCommand_DS18B20(skipRom);
-	   _delay_us(300);
+	   {_delay_us(20);
+	   sendCommand_DS18B20(skipRom);//isn't necessary to check ID
+	   _delay_us(20);
 	   sendCommand_DS18B20(convertT);
-	   _delay_ms(750);
-	  
+	   _delay_ms(750);//delay needed for conversion time of the sensor
 	   }
-	  
+	  else
+		{
+			printString_LCD("sensor not found",1,0);
+			_delay_ms(2000);
+		}
 	   
+
 	   if(reset_DS18B20())
 	   {
 		  _delay_us(200);
@@ -203,13 +207,19 @@ float getTemp()
 		 _delay_us(200);
 		 uint8_t arr[9];
 		 receiveData_DS18B20(&arr,9);
-		 //DDRB=255; //for test porpuses only
-		 //PORTB=arr[0];
 		 return (float)(getTempInts(arr))+ getTempDecs(arr);
+		//_delay_ms(800);
 	   }
-	   _delay_ms(800);
-	   return -273.15;//if sensor failed return imposible temp
+	   else
+	   {
+			printString_LCD("check  PIND0    ",1,0);
+			_delay_ms(2000);
+			return(4000.00);
+		}
+	 
 }
+
+
 void init_LCD()
 {
 	DDRB=0xFF;// All pins of LCD_BUS are outputs
